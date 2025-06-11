@@ -1,13 +1,31 @@
-import { Injectable } from '@nestjs/common';
-import { Context, TextCommand, TextCommandContext } from 'necord';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Client } from 'discord.js';
+import { DISCORD_MIMO_CHANNEL_ID } from './common/constant';
 
 @Injectable()
 export class AppService {
-  @TextCommand({
-    name: 'ping',
-    description: 'Ping command!',
-  })
-  public onPing(@Context() [message]: TextCommandContext) {
-    return message.reply('pong!');
+  private readonly logger = new Logger(AppService.name);
+
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly client: Client,
+  ) {}
+
+  async createMimoThread() {
+    const channelId = this.configService.get(DISCORD_MIMO_CHANNEL_ID);
+    const channel = this.client.channels.cache.get(channelId);
+    if (channel && channel.isTextBased()) {
+      const message = await (channel as any).send(
+        '미모인증 테스트 스레드입니다!',
+      );
+      await message.startThread({
+        name: '미모인증 테스트',
+        autoArchiveDuration: 60,
+      });
+      this.logger.log('미모인증 테스트 스레드 생성 완료');
+    } else {
+      this.logger.error('채널을 찾을 수 없거나 텍스트 채널이 아닙니다.');
+    }
   }
 }
