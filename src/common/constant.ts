@@ -1,0 +1,2 @@
+export const DISCORD_BOT_TOKEN = 'DISCORD_BOT_TOKEN' as const;
+export const DISCORD_MIMO_CHANNEL_ID = 'DISCORD_MIMO_CHANNEL_ID' as const;
