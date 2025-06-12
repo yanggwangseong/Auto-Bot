@@ -1,0 +1,25 @@
+name: Cron Jobs
+
+on:
+  schedule:
+    # 매일 오후 4시 40분 (KST)
+    - cron: '40 7 * * *'
+    # 매일 오후 4시 45분 (KST)
+    - cron: '45 7 * * *'
+
+jobs:
+  mimo-thread:
+    if: github.event.schedule == '40 7 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Mimo Thread
+        run: |
+          curl -X GET https://auto-bot-swart.vercel.app/create-mimo-thread
+
+  core-time-thread:
+    if: github.event.schedule == '45 7 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Core Time Thread
+        run: |
+          curl -X GET https://auto-bot-swart.vercel.app/create-core-time-thread
