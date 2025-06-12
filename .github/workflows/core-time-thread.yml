@@ -1,0 +1,13 @@
+name: Core Time Thread Job
+
+on:
+  schedule:
+    - cron: '50 5 * * *' # 매일 오후 2:50 KST
+
+jobs:
+  create-core-time-thread:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Core Time Thread API
+        run: |
+          curl -X GET https://auto-bot-swart.vercel.app/create-core-time-thread

@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Client, TextChannel } from 'discord.js';
+import { Client } from 'discord.js';
 import { Context, SlashCommand, SlashCommandContext } from 'necord';
-import { DISCORD_MIMO_CHANNEL_ID } from './common/constant';
 
 @Injectable()
 export class AppCommands {
@@ -12,30 +11,19 @@ export class AppCommands {
   ) {}
 
   @SlashCommand({
-    name: 'testthread',
-    description: '미모인증 테스트 스레드 생성',
+    name: '인증하기',
+    description: '이미지 인증을 진행합니다.',
   })
-  public async onTestThread(@Context() [interaction]: SlashCommandContext) {
-    const channelId = this.configService.get(DISCORD_MIMO_CHANNEL_ID);
-    const channel = this.client.channels.cache.get(channelId) as TextChannel;
-    if (!channel) {
-      return interaction.reply({
-        content: '채널을 찾을 수 없습니다.',
-        ephemeral: true,
-      });
-    }
-
-    // 메시지 전송
-    const message = await channel.send('미모인증 테스트 스레드입니다!');
-    // 스레드 생성
-    await message.startThread({
-      name: '미모인증 테스트',
-      autoArchiveDuration: 60, // 1시간 후 자동 아카이브 (필요시 변경)
-    });
-
-    return interaction.reply({
-      content: '스레드가 생성되었습니다!',
+  async onAuthCommand(@Context() [interaction]: SlashCommandContext) {
+    const reply = await interaction.reply({
+      content: '이미지 파일을 첨부해서 이 메시지에 답장(Reply)해주세요!',
       ephemeral: true,
+      fetchReply: true,
     });
+    // 인증 메시지 ID를 AppService에 전달
+    const appService = (interaction.client as any).appService;
+    if (appService && typeof appService.setAuthMessageId === 'function') {
+      appService.setAuthMessageId(reply.id);
+    }
   }
 }
