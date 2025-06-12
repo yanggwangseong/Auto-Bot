@@ -11,7 +11,12 @@ export class AppController {
   }
 
   @Get('create-mimo-thread')
-  async createMimoThread() {
+  createMimoThread() {
     return this.appService.createMimoThread();
+  }
+
+  @Get('create-core-time-thread')
+  createCoreTimeThread() {
+    return this.appService.createCoreTimeThread();
   }
 }
