@@ -19,4 +19,9 @@ export class AppController {
   createCoreTimeThread() {
     return this.appService.createCoreTimeThread();
   }
+
+  @Get('attendance-check')
+  attendanceCheck() {
+    return this.appService.attendanceCheck();
+  }
 }

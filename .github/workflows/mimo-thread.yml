@@ -2,7 +2,7 @@ name: Mimo Thread Job
 
 on:
   schedule:
-    - cron: '50 23 * * *' # 매일 오전 8:50 KST
+    - cron: '0 11 * * *' # 매일 오후 8:00 KST
 
 jobs:
   create-mimo-thread:

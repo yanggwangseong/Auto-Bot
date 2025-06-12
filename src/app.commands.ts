@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { Context, SlashCommand, SlashCommandContext } from 'necord';
 
 @Injectable()
 export class AppCommands {
@@ -31,11 +30,11 @@ export class AppCommands {
   //     }
   //   }
   // }
-  @SlashCommand({
-    name: 'test-command',
-    description: 'test',
-  })
-  async onTestCommand(@Context() [interaction]: SlashCommandContext) {
-    return interaction.reply({ content: 'test' });
-  }
+  // @SlashCommand({
+  //   name: 'test-command',
+  //   description: 'test',
+  // })
+  // async onTestCommand(@Context() [interaction]: SlashCommandContext) {
+  //   return interaction.reply({ content: '처리 중입니다...', ephemeral: true });
+  // }
 }

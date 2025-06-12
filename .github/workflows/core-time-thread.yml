@@ -2,7 +2,7 @@ name: Core Time Thread Job
 
 on:
   schedule:
-    - cron: '50 5 * * *' # 매일 오후 2:50 KST
+    - cron: '10 11 * * *' # 매일 오후 8:10 KST
 
 jobs:
   create-core-time-thread:

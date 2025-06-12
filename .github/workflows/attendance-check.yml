@@ -1,0 +1,13 @@
+name: Attendance Check Job
+
+on:
+  schedule:
+    - cron: '20 11 * * *' # 매일 오후 8:20 KST
+
+jobs:
+  attendance-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Attendance Check API
+        run: |
+          curl -X GET https://auto-bot-swart.vercel.app/attendance-check
