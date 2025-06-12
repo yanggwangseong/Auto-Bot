@@ -321,7 +321,11 @@ export class AppService {
       // 코어타임 판정
       if (core) {
         const t = kst(core);
-        if (t.getHours() < 13 || t.getHours() >= 17) {
+        if (
+          t.getHours() < 13 ||
+          t.getHours() > 17 ||
+          (t.getHours() === 17 && t.getMinutes() > 0)
+        ) {
           late += 1;
         }
       }

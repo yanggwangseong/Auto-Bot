@@ -2,7 +2,7 @@ name: Core Time Thread Job
 
 on:
   schedule:
-    - cron: '50 5 * * *' # 매일 오후 2:50 (KST)
+    - cron: '50 3 * * *' # 매일 오후 12:50 (KST)
   workflow_dispatch:
 
 jobs:
