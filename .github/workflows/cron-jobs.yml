@@ -2,14 +2,13 @@ name: Cron Jobs
 
 on:
   schedule:
-    # 매일 오후 4시 40분 (KST)
-    - cron: '40 7 * * *'
-    # 매일 오후 4시 45분 (KST)
-    - cron: '45 7 * * *'
+    # 한 번만 실행되도록 정확한 날짜 설정 (예: 2025년 6월 13일)
+    - cron: '50 7 13 6 *' # 오후 4시 50분 (KST)
+    - cron: '55 7 13 6 *' # 오후 4시 55분 (KST)
 
 jobs:
   mimo-thread:
-    if: github.event.schedule == '40 7 * * *'
+    if: github.event.schedule == '50 7 13 6 *'
     runs-on: ubuntu-latest
     steps:
       - name: Create Mimo Thread
@@ -17,7 +16,7 @@ jobs:
           curl -X GET https://auto-bot-swart.vercel.app/create-mimo-thread
 
   core-time-thread:
-    if: github.event.schedule == '45 7 * * *'
+    if: github.event.schedule == '55 7 13 6 *'
     runs-on: ubuntu-latest
     steps:
       - name: Create Core Time Thread
