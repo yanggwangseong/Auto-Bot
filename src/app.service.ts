@@ -12,6 +12,18 @@ import '@js-joda/timezone';
 
 @Injectable()
 export class AppService {
+  private static attendanceStore = new Map<
+    string,
+    {
+      late: number;
+      absent: number;
+      totalLate: number;
+      totalAbsent: number;
+      lastMonth?: string;
+    }
+  >();
+  private static activeUsers = new Set<string>();
+  private static inactiveUsers = new Set<string>();
   private readonly logger = new Logger(AppService.name);
 
   constructor(
@@ -55,6 +67,68 @@ export class AppService {
     }
   }
 
+  /**
+   * 출석체크 결과 메시지에서 누적값 복원
+   */
+  async restoreAttendanceStateFromMessages() {
+    const channelId = this.configService.get(
+      DISCORD_ATTENDANCE_CHECK_CHANNEL_ID,
+    );
+    const channel = this.client.channels.cache.get(channelId);
+    if (!channel || !channel.isTextBased()) return;
+    const textChannel = channel as TextChannel;
+    const messages = await textChannel.messages.fetch({ limit: 30 }); // 최근 30개 메시지
+    const attendanceStore = AppService.attendanceStore;
+    const activeUsers = AppService.activeUsers;
+    const inactiveUsers = AppService.inactiveUsers;
+    attendanceStore.clear();
+    activeUsers.clear();
+    inactiveUsers.clear();
+    let lastMonth = '';
+    messages.forEach((msg) => {
+      const lines = msg.content.split('\n');
+      let inActiveSection = false;
+      let activeSection = false;
+      lines.forEach((line) => {
+        // 월별 결산 메시지에서 누적값 복원
+        const monthMatch = line.match(/^(\d{4}-\d{2}) 출석결과/);
+        if (monthMatch) {
+          lastMonth = monthMatch[1];
+        }
+        // 출석 누적값
+        const userMatch = line.match(/^(.+) : 지각:(\d+), 결석:(\d+)/);
+        if (userMatch) {
+          const name = userMatch[1].trim();
+          const late = parseInt(userMatch[2], 10);
+          const absent = parseInt(userMatch[3], 10);
+          // 이름으로 userId 찾기 (userMap 필요)
+          // 복원 시점에는 userMap이 없으므로, 이름을 userId로 매핑하는 별도 로직 필요
+          // 여기서는 이름을 userId로 사용(환경변수에 userId:이름 매핑이므로 역매핑 필요)
+          // 실제 복원은 attendanceCheck에서 userMap을 받아서 처리
+          attendanceStore.set(name, {
+            late,
+            absent,
+            totalLate: late,
+            totalAbsent: absent,
+            lastMonth,
+          });
+        }
+        // Active/InActive 섹션 구분
+        if (line.startsWith('Active')) {
+          activeSection = true;
+          inActiveSection = false;
+        } else if (line.startsWith('InActive')) {
+          inActiveSection = true;
+          activeSection = false;
+        } else if (line.startsWith('-')) {
+          const name = line.replace('-', '').trim();
+          if (activeSection) activeUsers.add(name);
+          if (inActiveSection) inactiveUsers.add(name);
+        }
+      });
+    });
+  }
+
   async attendanceCheck() {
     // 1. 참여자 목록/닉네임 매핑
     const PARTICIPANTS = this.configService.get<string>(DISCORD_PARTICIPANTS)!;
@@ -67,6 +141,31 @@ export class AppService {
       {} as Record<string, string>,
     );
     const userIds = Object.keys(userMap);
+    const nameToId = Object.fromEntries(
+      Object.entries(userMap).map(([id, name]) => [name, id]),
+    );
+
+    // 1-1. 누적값 복원
+    await this.restoreAttendanceStateFromMessages();
+    // 복원된 attendanceStore의 key가 이름이므로, userId로 변환
+    const attendanceStore = AppService.attendanceStore;
+    const activeUsers = AppService.activeUsers;
+    const inactiveUsers = AppService.inactiveUsers;
+    for (const [name, record] of attendanceStore.entries()) {
+      const id = nameToId[name];
+      if (id) {
+        attendanceStore.set(id, record);
+        attendanceStore.delete(name);
+        if (activeUsers.has(name)) {
+          activeUsers.add(id);
+          activeUsers.delete(name);
+        }
+        if (inactiveUsers.has(name)) {
+          inactiveUsers.add(id);
+          inactiveUsers.delete(name);
+        }
+      }
+    }
 
     // 2. 오늘 날짜 스레드 찾기
     const mimoThread = await this.findTodayThread(
@@ -91,14 +190,52 @@ export class AppService {
 
     // 5. 결과 메시지 생성
     const kstZone = ZoneId.of('Asia/Seoul');
-    const todayKST = ZonedDateTime.now(kstZone).toLocalDate().toString();
+    const now = ZonedDateTime.now(kstZone);
+    const todayKST = now.toLocalDate().toString();
+    const currentMonth = `${now.year()}-${String(now.monthValue()).padStart(2, '0')}`;
+
     let msg = `${todayKST} 출석체크 결과\n`;
     for (const id of userIds) {
       const { late, absent } = result[id] || { late: 0, absent: 1 };
-      msg += `${userMap[id]} : 지각:${late}, 결석:${absent}\n`;
+      if (!attendanceStore.has(id)) {
+        attendanceStore.set(id, {
+          late: 0,
+          absent: 0,
+          totalLate: 0,
+          totalAbsent: 0,
+          lastMonth: currentMonth,
+        });
+        activeUsers.add(id);
+      }
+
+      const record = attendanceStore.get(id)!;
+      record.totalLate += late;
+      record.totalAbsent += absent;
+      if (record.totalLate >= 3) {
+        record.totalAbsent += 1;
+        record.totalLate = 0;
+        activeUsers.delete(id);
+        inactiveUsers.add(id);
+        msg += `\n정보: \"${userMap[id]}\"님이 경고누적으로 InActive 회원으로 전환 되었습니다.\n`;
+      }
+      msg += `${userMap[id]} : 지각:${record.totalLate}, 결석:${record.totalAbsent}\n`;
     }
 
-    // 6. 출석체크 채널에 메시지 전송
+    msg += `\n${currentMonth} 출석결과\n`;
+    for (const id of userIds) {
+      const record = attendanceStore.get(id)!;
+      msg += `${userMap[id]} : 지각:${record.totalLate}, 결석:${record.totalAbsent}\n`;
+    }
+
+    msg += `\nActive (${activeUsers.size}명)\n`;
+    for (const id of activeUsers) {
+      msg += `- ${userMap[id]}\n`;
+    }
+    msg += `InActive (${inactiveUsers.size}명)\n`;
+    for (const id of inactiveUsers) {
+      msg += `- ${userMap[id]}\n`;
+    }
+
     const channelId = this.configService.get(
       DISCORD_ATTENDANCE_CHECK_CHANNEL_ID,
     );
