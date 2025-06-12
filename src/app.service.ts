@@ -58,7 +58,15 @@ export class AppService {
   async attendanceCheck() {
     // 1. 참여자 목록/닉네임 매핑
     const PARTICIPANTS = this.configService.get<string>(DISCORD_PARTICIPANTS)!;
-    const userIds = PARTICIPANTS.split(',').map((p) => p.trim());
+    const userMap = PARTICIPANTS.split(',').reduce(
+      (acc, pair) => {
+        const [id, name] = pair.split(':');
+        acc[id.trim()] = name.trim();
+        return acc;
+      },
+      {} as Record<string, string>,
+    );
+    const userIds = Object.keys(userMap);
 
     // 2. 오늘 날짜 스레드 찾기
     const mimoThread = await this.findTodayThread(
@@ -85,9 +93,9 @@ export class AppService {
     const kstZone = ZoneId.of('Asia/Seoul');
     const todayKST = ZonedDateTime.now(kstZone).toLocalDate().toString();
     let msg = `${todayKST} 출석체크 결과\n`;
-    for (const p of userIds) {
-      const { late, absent } = result[p] || { late: 0, absent: 1 };
-      msg += `${p} : 지각:${late}, 결석:${absent}\n`;
+    for (const id of userIds) {
+      const { late, absent } = result[id] || { late: 0, absent: 1 };
+      msg += `${userMap[id]} : 지각:${late}, 결석:${absent}\n`;
     }
 
     // 6. 출석체크 채널에 메시지 전송
