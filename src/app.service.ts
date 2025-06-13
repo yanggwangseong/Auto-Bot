@@ -34,37 +34,37 @@ export class AppService {
   async createMimoThread() {
     const channelId = this.configService.get(DISCORD_MIMO_CHANNEL_ID);
     const channel = this.client.channels.cache.get(channelId);
-    if (channel && channel.isTextBased()) {
-      const kstZone = ZoneId.of('Asia/Seoul');
-      const todayKST = ZonedDateTime.now(kstZone).toLocalDate().toString();
-      const threadTitle = `${todayKST} 미모인증`;
-      const message = await (channel as any).send(threadTitle);
-      await message.startThread({
-        name: threadTitle,
-        autoArchiveDuration: 60,
-      });
-      this.logger.log(`${threadTitle} 스레드 생성 완료`);
-    } else {
+    if (!channel || !channel.isTextBased()) {
       this.logger.error('채널을 찾을 수 없거나 텍스트 채널이 아닙니다.');
+      return;
     }
+    const kstZone = ZoneId.of('Asia/Seoul');
+    const todayKST = ZonedDateTime.now(kstZone).toLocalDate().toString();
+    const threadTitle = `${todayKST} 미모인증`;
+    const message = await (channel as any).send(threadTitle);
+    await message.startThread({
+      name: threadTitle,
+      autoArchiveDuration: 60,
+    });
+    this.logger.log(`${threadTitle} 스레드 생성 완료`);
   }
 
   async createCoreTimeThread() {
     const channelId = this.configService.get(DISCORD_CORE_TIME_CHANNEL_ID);
     const channel = this.client.channels.cache.get(channelId);
-    if (channel && channel.isTextBased()) {
-      const kstZone = ZoneId.of('Asia/Seoul');
-      const todayKST = ZonedDateTime.now(kstZone).toLocalDate().toString();
-      const threadTitle = `${todayKST} 코어타임`;
-      const message = await (channel as any).send(threadTitle);
-      await message.startThread({
-        name: threadTitle,
-        autoArchiveDuration: 60,
-      });
-      this.logger.log(`${threadTitle} 스레드 생성 완료`);
-    } else {
+    if (!channel || !channel.isTextBased()) {
       this.logger.error('채널을 찾을 수 없거나 텍스트 채널이 아닙니다.');
+      return;
     }
+    const kstZone = ZoneId.of('Asia/Seoul');
+    const todayKST = ZonedDateTime.now(kstZone).toLocalDate().toString();
+    const threadTitle = `${todayKST} 코어타임`;
+    const message = await (channel as any).send(threadTitle);
+    await message.startThread({
+      name: threadTitle,
+      autoArchiveDuration: 60,
+    });
+    this.logger.log(`${threadTitle} 스레드 생성 완료`);
   }
 
   /**
@@ -129,10 +129,9 @@ export class AppService {
     });
   }
 
-  async attendanceCheck() {
-    // 1. 참여자 목록/닉네임 매핑
+  getUserMap() {
     const PARTICIPANTS = this.configService.get<string>(DISCORD_PARTICIPANTS)!;
-    const userMap = PARTICIPANTS.split(',').reduce(
+    return PARTICIPANTS.split(',').reduce(
       (acc, pair) => {
         const [id, name] = pair.split(':');
         acc[id.trim()] = name.trim();
@@ -140,6 +139,11 @@ export class AppService {
       },
       {} as Record<string, string>,
     );
+  }
+
+  async attendanceCheck() {
+    // 1. 참여자 목록/닉네임 매핑
+    const userMap = this.getUserMap();
     const userIds = Object.keys(userMap);
     const nameToId = Object.fromEntries(
       Object.entries(userMap).map(([id, name]) => [name, id]),
@@ -194,6 +198,9 @@ export class AppService {
     const todayKST = now.toLocalDate().toString();
     const currentMonth = `${now.year()}-${String(now.monthValue()).padStart(2, '0')}`;
 
+    /**
+     * 일별 출석체크 결과
+     */
     let msg = `${todayKST} 출석체크 결과\n`;
     for (const id of userIds) {
       const { late, absent } = result[id] || { late: 0, absent: 1 };
@@ -209,20 +216,36 @@ export class AppService {
       }
 
       const record = attendanceStore.get(id)!;
-      record.totalLate += late;
-      record.totalAbsent += absent;
+      record.totalLate += late; // 지각
+      record.totalAbsent += absent; // 결석
+      /**
+       * 지각 3번 이상 누적 시 경고 totalAbsent 1 증가, 지각 totalLate 0으로 초기화
+       */
       if (record.totalLate >= 3) {
         record.totalAbsent += 1;
         record.totalLate = 0;
+      }
+
+      /**
+       * 경고 누적 3번 이상 시 InActive 회원으로 전환
+       *
+       */
+      if (record.totalAbsent >= 3) {
         activeUsers.delete(id);
         inactiveUsers.add(id);
+        record.totalAbsent = 0;
+        record.totalLate = 0;
         msg += `\n정보: \"${userMap[id]}\"님이 경고누적으로 InActive 회원으로 전환 되었습니다.\n`;
+      } else {
+        msg += `${userMap[id]} : 지각:${record.totalLate}, 결석:${record.totalAbsent}\n`;
       }
-      msg += `${userMap[id]} : 지각:${record.totalLate}, 결석:${record.totalAbsent}\n`;
     }
 
+    /**
+     * 월별 출석체크 결과
+     */
     msg += `\n${currentMonth} 출석결과\n`;
-    for (const id of userIds) {
+    for (const id of activeUsers) {
       const record = attendanceStore.get(id)!;
       msg += `${userMap[id]} : 지각:${record.totalLate}, 결석:${record.totalAbsent}\n`;
     }
@@ -310,7 +333,7 @@ export class AppService {
       const mimo = mimoTimes[userId];
       const core = coreTimes[userId];
 
-      // 미모인증 판정
+      // 미모인증 판정 (8:00 이후 지각)
       if (mimo) {
         const t = kst(mimo);
         if (t.getHours() > 8 || (t.getHours() === 8 && t.getMinutes() > 0)) {
@@ -318,7 +341,7 @@ export class AppService {
         }
       }
 
-      // 코어타임 판정
+      // 코어타임 판정 (13:00-17:00 사이가 아니면 지각)
       if (core) {
         const t = kst(core);
         if (
