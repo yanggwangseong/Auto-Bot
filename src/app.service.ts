@@ -77,7 +77,7 @@ export class AppService {
     const channel = this.client.channels.cache.get(channelId);
     if (!channel || !channel.isTextBased()) return;
     const textChannel = channel as TextChannel;
-    const messages = await textChannel.messages.fetch({ limit: 30 }); // 최근 30개 메시지
+    const messages = await textChannel.messages.fetch({ limit: 1 }); // 최근 1개 메시지
     const attendanceStore = AppService.attendanceStore;
     const activeUsers = AppService.activeUsers;
     const inactiveUsers = AppService.inactiveUsers;
@@ -216,6 +216,12 @@ export class AppService {
       }
 
       const record = attendanceStore.get(id)!;
+      if (record.lastMonth && record.lastMonth !== currentMonth) {
+        // 월이 변경되었을 때 초기화
+        record.totalLate = 0;
+        record.totalAbsent = 0;
+        record.lastMonth = currentMonth;
+      }
       record.totalLate += late; // 지각
       record.totalAbsent += absent; // 결석
       /**
