@@ -2,7 +2,7 @@ name: Attendance Check Job
 
 on:
   schedule:
-    - cron: '30 12 * * *' # 매일 오후 9:30 (KST)
+    - cron: '30 12 * * 1-5' # 한국 시간 기준 평일 오후 9:30
   workflow_dispatch:
 
 jobs:
