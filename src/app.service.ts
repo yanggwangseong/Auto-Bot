@@ -333,30 +333,39 @@ export class AppService {
       const mimo = mimoTimes[userId];
       const core = coreTimes[userId];
 
-      // 미모인증 판정 (8:00 이후 지각)
-      if (mimo) {
-        const t = kst(mimo);
-        if (t.getHours() > 8 || (t.getHours() === 8 && t.getMinutes() > 0)) {
+      /**
+       * 미모 인증과 코어타임 인증 둘다 만족 하는 경우 continue
+       * 미모 인증과 코어타임 인증 둘다 만족 하지 않는 경우 결석
+       * 미모 인증과 코어타임 인증 둘중 하나만 만족 하는 경우 지각
+       */
+      const mt = kst(mimo);
+      const ct = kst(core);
+
+      const isMimoLate =
+        mt.getHours() > 8 || (mt.getHours() === 8 && mt.getMinutes() > 0);
+
+      const isCoretimeLate =
+        ct.getHours() < 13 ||
+        ct.getHours() > 17 ||
+        (ct.getHours() === 17 && ct.getMinutes() > 0);
+
+      if (mimo && core) {
+        // 미모인증 판정 (8:00 이후 지각)
+        // 코어타임 판정 (13:00-17:00 사이가 아니면 지각)
+
+        // 미모인증 8시 이후 지각, 코어타임 판정 13:00-17:00 사이가 아니면 지각
+        // 둘중 하나만 만족 하는경우 지각 +1만 카운트
+        if (isMimoLate || isCoretimeLate) {
           late += 1;
         }
-      }
-
-      // 코어타임 판정 (13:00-17:00 사이가 아니면 지각)
-      if (core) {
-        const t = kst(core);
-        if (
-          t.getHours() < 13 ||
-          t.getHours() > 17 ||
-          (t.getHours() === 17 && t.getMinutes() > 0)
-        ) {
-          late += 1;
-        }
-      }
-
-      // 둘 다 없으면 결석
-      if (!mimo && !core) {
+      } else if (!mimo && !core) {
+        // 둘 다 없으면 결석
         absent = 1;
         late = 0;
+      } else {
+        // 미모 인증과 코어타임 인증 둘중 하나만 만족 하는 경우 지각
+
+        late += 1;
       }
 
       result[userId] = { late, absent };
