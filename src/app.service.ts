@@ -84,6 +84,10 @@ export class AppService {
     attendanceStore.clear();
     activeUsers.clear();
     inactiveUsers.clear();
+
+    // 메시지가 없는 경우 바로 리턴 (attendanceCheck에서 새로 시작)
+    if (messages.size === 0) return;
+
     let lastMonth = '';
     messages.forEach((msg) => {
       const lines = msg.content.split('\n');
