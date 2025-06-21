@@ -32,12 +32,19 @@ export class AppService {
   ) {}
 
   async createMimoThread() {
-    const channelId = this.configService.get(DISCORD_MIMO_CHANNEL_ID);
+    const channelId = this.configService.get<string>(DISCORD_MIMO_CHANNEL_ID)!;
     const channel = this.client.channels.cache.get(channelId);
     if (!channel || !channel.isTextBased()) {
       this.logger.error('채널을 찾을 수 없거나 텍스트 채널이 아닙니다.');
       return;
     }
+
+    const todayThread = await this.findTodayThread(channelId, '미모인증');
+    if (todayThread) {
+      this.logger.log('오늘의 미모인증 스레드가 이미 존재합니다.');
+      return;
+    }
+
     const kstZone = ZoneId.of('Asia/Seoul');
     const todayKST = ZonedDateTime.now(kstZone).toLocalDate().toString();
     const threadTitle = `${todayKST} 미모인증`;
