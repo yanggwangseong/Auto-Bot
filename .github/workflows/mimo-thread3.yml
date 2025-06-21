@@ -1,4 +1,4 @@
-name: Mimo Thread Job
+name: Mimo Thread Job3
 
 on:
   schedule:
